@@ -1,10 +1,9 @@
 import torch
 from torch.utils.data import DataLoader
-import tqdm
+import tqdm # Progress bar
 
 
 class Trainer:
-
     def __init__(self, model, optimizer, loss_fn=None, train_data=None,
                  test_data=None, batch_size=None, device=None):
         """Note: Trainer objects don't know about the database."""

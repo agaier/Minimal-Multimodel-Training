@@ -1,15 +1,18 @@
 import argparse
 import os
 import pathlib
+import time
+
 import numpy as np
 import torch
-import torch.nn as nn
 import torch.multiprocessing as _mp
-from torchvision.datasets import MNIST
+import torch.nn as nn
 import torchvision.transforms as transforms
+from torchvision.datasets import MNIST
+
 from model import Net
 from trainer import Trainer
-from utils import get_optimizer, exploit_and_explore
+from utils import exploit_and_explore, get_optimizer
 
 mp = _mp.get_context('spawn')
 
@@ -47,6 +50,7 @@ class Worker(mp.Process):
             try:
                 self.trainer.train()
                 score = self.trainer.eval()
+                #score = 0
                 self.trainer.save_checkpoint(checkpoint_path)
                 self.finish_tasks.put(dict(id=task['id'], score=score))
             except KeyboardInterrupt:
@@ -88,17 +92,44 @@ class Explorer(mp.Process):
                 for task in tasks:
                     self.population.put(task)
 
+class Finisher(mp.Process):
+    def __init__(self, epoch, max_epoch, population, finish_tasks):
+        super().__init__()
+        self.epoch = epoch
+        self.max_epoch = max_epoch
+        self.population = population
+        self.finish_tasks = finish_tasks
+
+
+    def run(self):
+        while True:
+            if self.epoch.value > self.max_epoch:
+                break
+            if self.population.empty() and self.finish_tasks.full():
+                print("Finished")
+                tasks = []
+                while not self.finish_tasks.empty():
+                    tasks.append(self.finish_tasks.get())
+                with self.epoch.get_lock():
+                    self.epoch.value += 1
+                for task in tasks:
+                    self.population.put(task)       
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Population Based Training")
     parser.add_argument("--device", type=str, default='cuda',
                         help="")
-    parser.add_argument("--population_size", type=int, default=10,
+    parser.add_argument("--population_size", type=int, default=2,
                         help="")
-    parser.add_argument("--batch_size", type=int, default=20,
+    parser.add_argument("--batch_size", type=int, default=200,
                         help="")
 
     args = parser.parse_args()
+    n_proc = 2
+    max_epoch = 0
+
+
     # mp.set_start_method("spawn")
     mp = mp.get_context('forkserver')
     device = args.device
@@ -106,11 +137,12 @@ if __name__ == "__main__":
         device = 'cpu'
     population_size = args.population_size
     batch_size = args.batch_size
-    max_epoch = 20
+
     pathlib.Path('checkpoints').mkdir(exist_ok=True)
     checkpoint_str = "checkpoints/task-%03d.pth"
     population = mp.Queue(maxsize=population_size)
     finish_tasks = mp.Queue(maxsize=population_size)
+
     epoch = mp.Value('i', 0)
     for i in range(population_size):
         population.put(dict(id=i, score=0))
@@ -120,8 +152,12 @@ if __name__ == "__main__":
     train_data = MNIST(train_data_path, True, transforms.ToTensor(), download=True)
     test_data = MNIST(test_data_path, False, transforms.ToTensor(), download=True)
     workers = [Worker(batch_size, epoch, max_epoch, train_data, test_data, population, finish_tasks, device)
-               for _ in range(3)]
+            for _ in range(n_proc)]
     workers.append(Explorer(epoch, max_epoch, population, finish_tasks, hyper_params))
+    #workers.append(Finisher(epoch, max_epoch, population, finish_tasks))
+
+    t_start = time.time()
+
     [w.start() for w in workers]
     [w.join() for w in workers]
     task = []
@@ -129,5 +165,8 @@ if __name__ == "__main__":
         task.append(finish_tasks.get())
     while not population.empty():
         task.append(population.get())
+    train_time = time.time() - t_start
+
     task = sorted(task, key=lambda x: x['score'], reverse=True)
     print('best score on', task[0]['id'], 'is', task[0]['score'])
+    print(f"****] Time: {train_time}")
