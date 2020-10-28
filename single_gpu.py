@@ -46,7 +46,7 @@ class Worker(mp.Process):
             if os.path.isfile(checkpoint_path):
                 self.trainer.load_checkpoint(checkpoint_path)
             try:
-                if self.epoch.value > self.max_epoch:
+                if self.epoch.value > self.max_epoch: # In case you get here before epoch is updated
                   break
                 self.trainer.train()
                 score = 0
@@ -72,9 +72,8 @@ class Sentinel(mp.Process):
                 tasks = []
                 while not self.finish_tasks.empty():
                     tasks.append(self.finish_tasks.get())
-                for task in tasks:
-                    with self.epoch.get_lock():
-                        self.epoch.value += 1
+                with self.epoch.get_lock():
+                    self.epoch.value += 1
                 for task in tasks:
                     self.population.put(task)
 
@@ -83,9 +82,9 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Population Based Training")
     parser.add_argument("--device", type=str, default='cuda',
                         help="")
-    parser.add_argument("--population_size", type=int, default=10,
+    parser.add_argument("--population_size", type=int, default=12,
                         help="")
-    parser.add_argument("--num_workers", type=int, default=10,
+    parser.add_argument("--num_workers", type=int, default=4,
                         help="")                        
     parser.add_argument("--batch_size", type=int, default=200,
                         help="")
@@ -126,6 +125,8 @@ if __name__ == "__main__":
     t_start = time.time()
     [w.start() for w in workers] # Start workers
     [w.join() for w in workers]  # Gather up threads
+
+
     print(f'Training with {str(num_workers)} workers:\t{time.time() - t_start}\n\n')
 
     # task = []
@@ -136,7 +137,7 @@ if __name__ == "__main__":
     # task = sorted(task, key=lambda x: x['score'], reverse=True)
     # print('best score on', task[0]['id'], 'is', task[0]['score'])
 
-    # # Checkpoint saving for picking up models
+    # Checkpoint saving for picking up models
     # hyper_params = {'optimizer': ["lr", "momentum"], "batch_size": True}
     # pathlib.Path('checkpoints').mkdir(exist_ok=True)
     # checkpoint_str = "checkpoints/task-%03d.pth"
