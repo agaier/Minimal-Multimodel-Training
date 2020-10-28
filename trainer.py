@@ -1,6 +1,6 @@
 import torch
+import tqdm  # Progress bar
 from torch.utils.data import DataLoader
-import tqdm # Progress bar
 
 
 class Trainer:

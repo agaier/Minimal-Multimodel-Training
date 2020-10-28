@@ -126,18 +126,4 @@ if __name__ == "__main__":
     [w.start() for w in workers] # Start workers
     [w.join() for w in workers]  # Gather up threads
 
-
     print(f'Training with {str(num_workers)} workers:\t{time.time() - t_start}\n\n')
-
-    # task = []
-    # while not finish_tasks.empty():
-    #     task.append(finish_tasks.get())
-    # while not population.empty():
-    #     task.append(population.get())
-    # task = sorted(task, key=lambda x: x['score'], reverse=True)
-    # print('best score on', task[0]['id'], 'is', task[0]['score'])
-
-    # Checkpoint saving for picking up models
-    # hyper_params = {'optimizer': ["lr", "momentum"], "batch_size": True}
-    # pathlib.Path('checkpoints').mkdir(exist_ok=True)
-    # checkpoint_str = "checkpoints/task-%03d.pth"

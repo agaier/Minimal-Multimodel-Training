@@ -1,16 +1,18 @@
 import argparse
 import os
 import pathlib
+import time
+
 import numpy as np
 import torch
-import torch.nn as nn
 import torch.multiprocessing as _mp
-from torchvision.datasets import MNIST
+import torch.nn as nn
 import torchvision.transforms as transforms
+from torchvision.datasets import MNIST
+
 from model import Net
 from trainer import Trainer
 from utils import get_optimizer
-import time
 
 mp = _mp.get_context('spawn')
 
